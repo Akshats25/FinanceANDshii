@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuantEdge — Live Trading Dashboard</title>
+  <meta name="description" content="Live algo-trading dashboard: NIFTY options, BTC, mean-reversion & pattern-reversal strategies." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════ SIDEBAR ═══════════════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">⚡</div>
+    <div class="logo-text">
+      <span class="logo-title">QuantEdge</span>
+      <span class="logo-sub">Live Trading System</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <button class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="nav-icon">📊</span><span>Dashboard</span></button>
+    <button class="nav-item" onclick="showPage('btc')"       id="nav-btc">      <span class="nav-icon">₿</span><span>BTC Live</span></button>
+    <button class="nav-item" onclick="showPage('backtest')"  id="nav-backtest">  <span class="nav-icon">🔬</span><span>Backtest Lab</span></button>
+    <button class="nav-item" onclick="showPage('paper')"     id="nav-paper">     <span class="nav-icon">📡</span><span>Paper Trading</span></button>
+    <button class="nav-item" onclick="showPage('signals')"   id="nav-signals">   <span class="nav-icon">📈</span><span>Signal Monitor</span></button>
+    <button class="nav-item" onclick="showPage('options')"   id="nav-options">   <span class="nav-icon">🔗</span><span>Option Chain</span></button>
+    <button class="nav-item" onclick="showPage('pricer')"    id="nav-pricer">    <span class="nav-icon">🧮</span><span>Option Pricer</span></button>
+    <button class="nav-item" onclick="showPage('journal')"   id="nav-journal">   <span class="nav-icon">📋</span><span>Trade Journal</span></button>
+    <button class="nav-item" onclick="showPage('config')"    id="nav-config">    <span class="nav-icon">⚙️</span><span>Config</span></button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div>
+      <div class="mode-badge" id="mode-badge">BACKTEST</div>
+      <div class="broker-status-line" id="broker-status-line">● Connecting...</div>
+    </div>
+    <div class="sidebar-time" id="sidebar-time">--:--:--</div>
+  </div>
+</aside>
+
+<!-- ═══════════════════════ MAIN ═══════════════════════ -->
+<main class="main">
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="breadcrumb" id="breadcrumb">Dashboard</div>
+    </div>
+    <div class="topbar-right">
+      <div class="market-strip">
+        <!-- NIFTY -->
+        <div class="market-chip" id="chip-nifty">
+          <span class="chip-label">NIFTY</span>
+          <span class="chip-val" id="nifty-val">—</span>
+          <span class="chip-chg" id="nifty-src">live</span>
+        </div>
+        <!-- BANKNIFTY -->
+        <div class="market-chip" id="chip-bnifty">
+          <span class="chip-label">BANKNIFTY</span>
+          <span class="chip-val" id="bnifty-val">—</span>
+        </div>
+        <!-- BTC -->
+        <div class="market-chip btc" id="chip-btc">
+          <span class="chip-label">₿ BTC</span>
+          <span class="chip-val" id="btc-val">—</span>
+          <span class="chip-chg" id="btc-chg">—</span>
+        </div>
+      </div>
+      <div class="ks-chip" id="ks-chip"><span class="ks-dot safe"></span><span>Safe</span></div>
+    </div>
+  </header>
+
+  <!-- ───────────────── DASHBOARD PAGE ───────────────── -->
+  <section class="page active" id="page-dashboard">
+    <div class="page-header">
+      <h1>Overview</h1>
+      <p class="page-desc">Live system snapshot — prices refresh every 10 s</p>
+    </div>
+
+    <!-- Broker banner (shown only when not connected) -->
+    <div class="alert-banner warning" id="broker-banner" style="display:none">
+      ⚠️ <strong>Angel One not connected.</strong> Fill credentials in <code>config.py</code> then restart.
+      NIFTY/BANKNIFTY prices will show N/A; all other features work.
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi-card"><div class="kpi-icon green">₹</div><div class="kpi-body"><div class="kpi-label">Capital</div><div class="kpi-value" id="kpi-capital">₹1,00,000</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon blue">📈</div><div class="kpi-body"><div class="kpi-label">Daily P&L</div><div class="kpi-value" id="kpi-pnl">₹0.00</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon purple">🔢</div><div class="kpi-body"><div class="kpi-label">Open Positions</div><div class="kpi-value" id="kpi-positions">0 / 1</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon orange">⚡</div><div class="kpi-body"><div class="kpi-label">Kill Switch</div><div class="kpi-value" id="kpi-ks">Safe</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon teal">₿</div><div class="kpi-body"><div class="kpi-label">BTC (USD)</div><div class="kpi-value" id="kpi-btc">—</div></div></div>
+    </div>
+
+    <div class="grid-2" style="margin-top:1.5rem">
+      <div class="card">
+        <div class="card-header"><h2>Risk Monitor</h2><span class="badge" id="risk-status-badge">OK</span></div>
+        <div class="risk-bar-labels"><span>Daily Loss: <strong id="risk-loss-val">₹0</strong></span><span>Limit: <strong id="risk-limit-val">—</strong></span></div>
+        <div class="risk-bar-track"><div class="risk-bar-fill" id="risk-bar-fill" style="width:0%"></div></div>
+        <div class="risk-bar-pct" id="risk-bar-pct">0% of daily limit used</div>
+        <div class="risk-details" style="margin-top:12px">
+          <div class="risk-row"><span>Can Trade</span><span class="pill green" id="risk-can-trade">Yes</span></div>
+          <div class="risk-row"><span>Max Concurrent</span><span class="pill blue" id="risk-max-conc">1</span></div>
+          <div class="risk-row"><span>Kill Switch</span><span class="pill" id="risk-ks-pill">Safe</span></div>
+        </div>
+        <div class="card-actions"><button class="btn btn-danger btn-sm" onclick="resetKillSwitch()">Reset Kill Switch</button></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>NIFTY Sparkline</h2><span class="badge blue" id="nifty-sparkline-badge">Live</span></div>
+        <div class="chart-wrap"><canvas id="nifty-sparkline" height="140"></canvas></div>
+        <div style="margin-top:12px">
+          <div class="risk-row"><span>Last LTP</span><span id="nifty-sparkline-ltp" class="pill blue">—</span></div>
+          <div class="risk-row"><span>BTC 24h Vol</span><span id="btc-vol-24" class="pill teal">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-header"><h2>Quick Backtest (Synthetic Data)</h2><button class="btn btn-primary btn-sm" onclick="runQuickBacktest()">▶ Run</button></div>
+      <div id="quick-backtest-result" class="quick-result-empty">Click "Run" to see a quick backtest on synthetic NIFTY data.</div>
+    </div>
+  </section>
+
+
+  <!-- ───────────────── BTC PAGE ───────────────── -->
+  <section class="page" id="page-btc">
+    <div class="page-header">
+      <h1>BTC Live</h1>
+      <p class="page-desc">Real-time Bitcoin data via Binance + CoinGecko (no API key required)</p>
+    </div>
+
+    <div class="kpi-row" id="btc-kpis">
+      <div class="kpi-card"><div class="kpi-icon teal">$</div><div class="kpi-body"><div class="kpi-label">Price (USD)</div><div class="kpi-value" id="btc-kpi-usd">—</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon orange">₹</div><div class="kpi-body"><div class="kpi-label">Price (INR)</div><div class="kpi-value" id="btc-kpi-inr">—</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon blue">📉</div><div class="kpi-body"><div class="kpi-label">24h Change</div><div class="kpi-value" id="btc-kpi-chg">—</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon purple">📦</div><div class="kpi-body"><div class="kpi-label">24h Volume</div><div class="kpi-value" id="btc-kpi-vol">—</div></div></div>
+    </div>
+
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-header">
+        <h2>BTC/USDT Candlestick Chart</h2>
+        <div class="header-actions">
+          <select id="btc-interval" class="form-control form-control-sm" onchange="loadBtcChart()">
+            <option value="1m">1 min</option>
+            <option value="5m" selected>5 min</option>
+            <option value="15m">15 min</option>
+            <option value="1h">1 hour</option>
+            <option value="4h">4 hour</option>
+            <option value="1d">1 day</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="loadBtcChart()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="btc-price-chart" height="220"></canvas></div>
+    </div>
+
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-header">
+        <h2>BTC Z-Score Signal</h2>
+        <div class="header-actions">
+          <input type="number" id="btc-zscore-window" class="form-control form-control-sm" value="20" min="5" max="50" />
+          <button class="btn btn-secondary btn-sm" onclick="loadBtcZscore()">Run Z-Score</button>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
+        Applying the same mean-reversion z-score signal used for NIFTY options — but on live BTC data from Binance.
+      </p>
+      <div class="chart-wrap"><canvas id="btc-zscore-chart" height="180"></canvas></div>
+    </div>
+  </section>
+
+
+  <!-- ───────────────── BACKTEST PAGE ───────────────── -->
+  <section class="page" id="page-backtest">
+    <div class="page-header">
+      <h1>Backtest Lab</h1>
+      <p class="page-desc">Synthetic data simulation <em>or</em> upload a real Angel One CSV export</p>
+    </div>
+
+    <div class="card backtest-controls">
+      <div class="tabs">
+        <button class="tab active" onclick="switchBtTab('synthetic')" id="tab-synthetic">Synthetic Data</button>
+        <button class="tab" onclick="switchBtTab('upload')"    id="tab-upload">Upload CSV</button>
+        <button class="tab" onclick="switchBtTab('live')"      id="tab-live">Fetch from Angel One</button>
+      </div>
+
+      <!-- Synthetic -->
+      <div id="bt-panel-synthetic" class="bt-panel">
+        <div class="form-row">
+          <div class="form-group"><label>Strategy</label>
+            <select id="bt-strategy" class="form-control">
+              <option value="mean_reversion">Mean Reversion</option>
+              <option value="pattern_reversal">Pattern Reversal</option>
+            </select></div>
+          <div class="form-group"><label>Instrument</label>
+            <select id="bt-instrument" class="form-control">
+              <option value="NIFTY">NIFTY</option>
+              <option value="BTC">Bitcoin (BTC)</option>
+            </select></div>
+          <div class="form-group"><label>Bars (5-min)</label><input type="number" id="bt-bars" class="form-control" value="390" /></div>
+          <div class="form-group"><label>Base Price (₹)</label><input type="number" id="bt-price" class="form-control" value="22000" /></div>
+          <div class="form-group align-end"><button class="btn btn-primary" onclick="runFullBacktest('synthetic')" id="bt-run-btn">▶ Run Backtest</button></div>
+        </div>
+      </div>
+
+      <!-- CSV Upload -->
+      <div id="bt-panel-upload" class="bt-panel" style="display:none">
+        <div class="form-row">
+          <div class="form-group"><label>Strategy</label>
+            <select id="bt-strategy-upload" class="form-control">
+              <option value="mean_reversion">Mean Reversion</option>
+              <option value="pattern_reversal">Pattern Reversal</option>
+            </select></div>
+          <div class="form-group"><label>Instrument</label>
+            <select id="bt-instrument-upload" class="form-control">
+              <option value="NIFTY">NIFTY</option>
+              <option value="BTC">Bitcoin (BTC)</option>
+            </select></div>
+          <div class="form-group"><label>CSV File (timestamp, open, high, low, close, volume)</label>
+            <input type="file" id="bt-csv-file" class="form-control" accept=".csv" /></div>
+          <div class="form-group align-end"><button class="btn btn-primary" onclick="runFullBacktest('upload')" id="bt-upload-btn">▶ Run on CSV</button></div>
+        </div>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:8px">Export from Angel One → getCandleData or your broker's historical export. Columns must be exactly: timestamp, open, high, low, close, volume.</p>
+      </div>
+
+      <!-- Live fetch -->
+      <div id="bt-panel-live" class="bt-panel" style="display:none">
+        <div class="form-row">
+          <div class="form-group"><label>Strategy</label>
+            <select id="bt-strategy-live" class="form-control">
+              <option value="mean_reversion">Mean Reversion</option>
+              <option value="pattern_reversal">Pattern Reversal</option>
+            </select></div>
+          <div class="form-group"><label>Instrument</label>
+            <select id="bt-instrument-live" class="form-control" onchange="document.getElementById('bt-broker-banner').style.display = this.value === 'BTC' ? 'none' : 'flex'">
+              <option value="NIFTY">NIFTY (Angel One)</option>
+              <option value="BTC">Bitcoin (Binance)</option>
+            </select></div>
+          <div class="form-group"><label>Symbol Token</label><input type="text" id="bt-token" class="form-control" value="99926000" placeholder="NIFTY token" /></div>
+          <div class="form-group"><label>Exchange</label>
+            <select id="bt-exchange" class="form-control"><option value="NSE">NSE</option><option value="NFO">NFO</option></select></div>
+          <div class="form-group"><label>Interval</label>
+            <select id="bt-interval" class="form-control">
+              <option value="ONE_MINUTE">1 Min</option>
+              <option value="FIVE_MINUTE" selected>5 Min</option>
+              <option value="FIFTEEN_MINUTE">15 Min</option>
+              <option value="ONE_HOUR">1 Hour</option>
+            </select></div>
+          <div class="form-group"><label>From Date</label><input type="datetime-local" id="bt-from" class="form-control" /></div>
+          <div class="form-group"><label>To Date</label><input type="datetime-local" id="bt-to" class="form-control" /></div>
+          <div class="form-group align-end"><button class="btn btn-primary" onclick="runFullBacktest('live')" id="bt-live-btn">▶ Fetch & Run</button></div>
+        </div>
+        <div class="alert-banner info" id="bt-broker-banner" style="display:none">⚠ Angel One not connected — fill credentials in config.py to use this tab.</div>
+      </div>
+    </div>
+
+    <div id="bt-loading" class="loading-state" style="display:none"><div class="spinner"></div><span>Running backtest...</span></div>
+
+    <div id="bt-results" style="display:none">
+      <div class="kpi-row" style="margin-top:1.5rem">
+        <div class="kpi-card"><div class="kpi-icon green">📊</div><div class="kpi-body"><div class="kpi-label">Total Trades</div><div class="kpi-value" id="bt-trades">0</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon blue">💰</div><div class="kpi-body"><div class="kpi-label">Total P&L</div><div class="kpi-value" id="bt-pnl">₹0</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon purple">🎯</div><div class="kpi-body"><div class="kpi-label">Win Rate</div><div class="kpi-value" id="bt-winrate">0%</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon orange">📉</div><div class="kpi-body"><div class="kpi-label">Max Drawdown</div><div class="kpi-value" id="bt-dd">0%</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon teal">⚡</div><div class="kpi-body"><div class="kpi-label">Sharpe</div><div class="kpi-value" id="bt-sharpe">0</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon red">📐</div><div class="kpi-body"><div class="kpi-label">Profit Factor</div><div class="kpi-value" id="bt-pf">0</div></div></div>
+      </div>
+      <div class="data-source-tag" id="bt-data-src"></div>
+
+      <div class="grid-2">
+        <div class="card"><div class="card-header"><h2>Equity Curve</h2></div><div class="chart-wrap"><canvas id="equity-chart" height="200"></canvas></div></div>
+        <div class="card"><div class="card-header"><h2>Daily P&L</h2></div><div class="chart-wrap"><canvas id="daily-pnl-chart" height="200"></canvas></div></div>
+      </div>
+
+      <div class="card" style="margin-top:1.5rem">
+        <div class="card-header"><h2>Trade Log</h2><span class="badge" id="bt-trade-count">0 trades</span></div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Entry Time</th><th>Exit Time</th><th>Direction</th><th>Strike / Entry</th><th>Entry ₹</th><th>Exit ₹</th><th>Reason</th><th>Net P&L</th></tr></thead>
+            <tbody id="bt-trade-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ───────────────── PAPER TRADING PAGE ───────────────── -->
+  <section class="page" id="page-paper">
+    <div class="page-header">
+      <h1>Paper Trading</h1>
+      <p class="page-desc">Runs real strategy logic — uses live NIFTY LTP if broker connected, else simulated</p>
+    </div>
+
+    <div class="card paper-controls">
+      <div class="paper-status-row">
+        <div class="paper-status-indicator">
+          <span class="dot" id="paper-dot"></span>
+          <span id="paper-status-text">Stopped</span>
+          <span class="badge" id="paper-src-badge" style="display:none">simulated</span>
+        </div>
+        <div class="paper-actions">
+          <button class="btn btn-success" onclick="startPaper(true)"  id="btn-paper-real">▶ Start (Real Price)</button>
+          <button class="btn btn-secondary" onclick="startPaper(false)" id="btn-paper-sim">▶ Start (Simulated)</button>
+          <button class="btn btn-danger" onclick="stopPaper()" id="btn-paper-stop" disabled>⏹ Stop</button>
+          <button class="btn btn-ghost" onclick="resetPaper()">↺ Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-top:1.5rem">
+      <div class="kpi-card"><div class="kpi-icon blue">💰</div><div class="kpi-body"><div class="kpi-label">Daily P&L</div><div class="kpi-value" id="paper-pnl">₹0.00</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon green">📊</div><div class="kpi-body"><div class="kpi-label">Bars Collected</div><div class="kpi-value" id="paper-bars">0</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon orange">⚡</div><div class="kpi-body"><div class="kpi-label">Kill Switch</div><div class="kpi-value" id="paper-ks">Safe</div></div></div>
+    </div>
+
+    <div class="grid-2" style="margin-top:1.5rem">
+      <div class="card">
+        <div class="card-header"><h2>Open Trade</h2></div>
+        <div id="paper-trade-display" class="trade-display empty">No open trade</div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Event Log</h2><span class="badge" id="paper-log-count">0 events</span></div>
+        <div class="event-log" id="paper-log"></div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ───────────────── STRATEGY EXECUTION PAGE ───────────────── -->
+  <section class="page" id="page-signals">
+    <div class="page-header">
+      <h1>Strategy Execution (Pattern Reversal)</h1>
+      <p class="page-desc">1-min chart signals with auto swing-low stop & R:R target. Place live orders.</p>
+    </div>
+
+    <div class="card" style="margin-bottom:1.5rem">
+      <div class="form-row" style="align-items:flex-end">
+        <div class="form-group"><label>Instrument</label>
+          <select id="exec-instrument" class="form-control form-control-sm" onchange="execUpdateChart()">
+            <option value="NIFTY">NIFTY (Angel One LTP)</option>
+            <option value="BTC">BTC (Binance Live)</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Execution Mode</label>
+          <select id="exec-mode" class="form-control form-control-sm">
+            <option value="paper">Paper Trading (Simulated Fill)</option>
+            <option value="real">Real Angel One Order</option>
+          </select>
+        </div>
+        <div class="form-group"><button class="btn btn-secondary btn-sm" onclick="execUpdateChart()">🔄 Refresh Chart & Signals</button></div>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <!-- Chart -->
+      <div class="card" style="grid-column: span 2">
+        <div class="card-header">
+          <h2>Live Chart (1-min) + Signals</h2>
+          <span class="badge blue" id="exec-ltp-badge">Live: ₹—</span>
+        </div>
+        <div class="chart-wrap"><canvas id="exec-price-chart" height="250"></canvas></div>
+      </div>
+
+      <!-- Order Ticket -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Order Ticket</h2>
+          <span class="badge" id="exec-signal-badge">No Signal</span>
+        </div>
+        
+        <div class="form-grid" style="grid-template-columns: 1fr; gap: 12px">
+          <div class="form-group">
+            <label>Direction</label>
+            <select id="exec-direction" class="form-control" onchange="execRecalcTrade()">
+              <option value="LONG">BUY (LONG)</option>
+              <option value="SHORT">SELL (SHORT)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Entry Price</label>
+            <input type="number" id="exec-entry" class="form-control" onchange="execRecalcTrade()" />
+          </div>
+          <div class="form-group">
+            <label>Stop Loss (Auto Swing)</label>
+            <input type="number" id="exec-sl" class="form-control" onchange="execUpdateRiskReward()" />
+          </div>
+          <div class="form-group">
+            <label>Risk:Reward (R:R)</label>
+            <select id="exec-rr" class="form-control" onchange="execRecalcTrade()">
+              <option value="1">1:1</option>
+              <option value="1.5">1.5:1</option>
+              <option value="2" selected>2:1 (Standard)</option>
+              <option value="3">3:1</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Target Price</label>
+            <input type="number" id="exec-target" class="form-control" readonly />
+          </div>
+          <div class="form-group">
+            <label>Quantity</label>
+            <input type="number" id="exec-qty" class="form-control" />
+          </div>
+        </div>
+
+        <div class="risk-details" style="margin-top:16px; margin-bottom:16px">
+          <div class="risk-row"><span>Risk Amount</span><span id="exec-risk-val" style="color:var(--red); font-weight:600">₹0</span></div>
+          <div class="risk-row"><span>Target Reward</span><span id="exec-reward-val" style="color:var(--green); font-weight:600">₹0</span></div>
+        </div>
+        
+        <button class="btn btn-primary" style="width:100%" onclick="execPlaceOrder()">▶ Place Order</button>
+      </div>
+    </div>
+
+    <!-- Positions -->
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-header">
+        <h2>Today's Positions</h2>
+        <button class="btn btn-ghost btn-sm" onclick="execLoadPositions()">🔄 Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID / Time</th>
+              <th>Instrument</th>
+              <th>Direction</th>
+              <th>Qty</th>
+              <th>Entry</th>
+              <th>Current / Exit</th>
+              <th>SL / TGT</th>
+              <th>Net P&L</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="exec-positions-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ───────────────── OPTION CHAIN PAGE ───────────────── -->
+  <section class="page" id="page-options">
+    <div class="page-header">
+      <h1>Option Chain</h1>
+      <p class="page-desc">Live strikes from Angel One scrip master — nearest weekly expiry (NIFTY)</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Chain Controls</h2>
+        <div class="header-actions">
+          <select id="oc-underlying" class="form-control form-control-sm">
+            <option value="NIFTY">NIFTY</option>
+            <option value="BANKNIFTY">BANKNIFTY</option>
+          </select>
+          <input type="text" id="oc-expiry" class="form-control form-control-sm" placeholder="Auto (nearest weekly)" />
+          <button class="btn btn-primary btn-sm" onclick="loadOptionChain()">🔄 Load Chain</button>
+        </div>
+      </div>
+      <div id="oc-info" class="risk-bar-pct" style="margin-bottom:12px"></div>
+    </div>
+
+    <div id="oc-loading" class="loading-state" style="display:none"><div class="spinner"></div><span>Fetching scrip master...</span></div>
+    <div id="oc-error" class="alert-banner warning" style="display:none"></div>
+
+    <div class="card" style="margin-top:1rem">
+      <div class="card-header"><h2>Strike Table</h2><span class="badge blue" id="oc-expiry-badge">—</span></div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>CE Symbol</th><th>CE Token</th>
+              <th class="strike-col">Strike</th>
+              <th>PE Symbol</th><th>PE Token</th>
+            </tr>
+          </thead>
+          <tbody id="oc-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ───────────────── OPTION PRICER PAGE ───────────────── -->
+  <section class="page" id="page-pricer">
+    <div class="page-header">
+      <h1>Option Pricer</h1>
+      <p class="page-desc">Black-Scholes with Greeks — auto-fills spot from live NIFTY LTP</p>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h2>Inputs</h2><button class="btn btn-ghost btn-sm" onclick="autofillPricerSpot()">⚡ Use Live Spot</button></div>
+        <div class="form-grid">
+          <div class="form-group"><label>Spot Price (₹)</label><input type="number" id="pr-spot" class="form-control" value="22000" /></div>
+          <div class="form-group"><label>Strike Price (₹)</label><input type="number" id="pr-strike" class="form-control" value="22000" /></div>
+          <div class="form-group"><label>Days to Expiry</label><input type="number" id="pr-tte" class="form-control" value="3" min="0.1" step="0.5" /></div>
+          <div class="form-group"><label>Implied Volatility (%)</label><input type="number" id="pr-iv" class="form-control" value="14" step="0.5" /></div>
+          <div class="form-group"><label>Risk-Free Rate (%)</label><input type="number" id="pr-rate" class="form-control" value="6.5" step="0.25" /></div>
+          <div class="form-group align-end"><button class="btn btn-primary" onclick="runPricer()">Calculate</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Output</h2></div>
+        <div id="pricer-output" class="pricer-output-empty">Enter inputs and click Calculate</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-header"><h2>Strike Surface (±1000 from ATM)</h2></div>
+      <div class="chart-wrap"><canvas id="iv-surface-chart" height="200"></canvas></div>
+      <div class="card-actions"><button class="btn btn-secondary btn-sm" onclick="buildIVSurface()">Build Chart</button></div>
+    </div>
+  </section>
+
+
+  <!-- ───────────────── JOURNAL PAGE ───────────────── -->
+  <section class="page" id="page-journal">
+    <div class="page-header">
+      <h1>Trade Journal</h1>
+      <p class="page-desc">Append-only log of all paper trading signals and fills</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Journal Entries</h2>
+        <div class="header-actions">
+          <span class="badge blue" id="journal-count">0 entries</span>
+          <button class="btn btn-secondary btn-sm" onclick="loadJournal()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div id="journal-empty" class="empty-state">No journal entries yet. Start paper trading to generate entries.</div>
+      <div class="table-wrap" id="journal-table-wrap" style="display:none">
+        <table class="data-table">
+          <thead><tr><th>Time</th><th>Strategy</th><th>Instrument</th><th>Direction</th><th>Qty</th><th>Entry</th><th>Exit</th><th>P&L</th><th>Status</th></tr></thead>
+          <tbody id="journal-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ───────────────── CONFIG PAGE ───────────────── -->
+  <section class="page" id="page-config">
+    <div class="page-header">
+      <h1>Configuration</h1>
+      <p class="page-desc">Live read-out of config.py — edit the file and restart to change</p>
+    </div>
+
+    <div class="grid-2">
+      <div class="card"><div class="card-header"><h2>Instrument & Mode</h2></div><div class="config-grid" id="cfg-instrument"></div></div>
+      <div class="card"><div class="card-header"><h2>Capital & Risk</h2></div><div class="config-grid" id="cfg-risk"></div></div>
+      <div class="card"><div class="card-header"><h2>Strategy 1 — Mean Reversion</h2></div><div class="config-grid" id="cfg-mr"></div></div>
+      <div class="card"><div class="card-header"><h2>Strategy 2 — Pattern Reversal</h2></div><div class="config-grid" id="cfg-pattern"></div></div>
+      <div class="card"><div class="card-header"><h2>Cost Model</h2></div><div class="config-grid" id="cfg-costs"></div></div>
+      <div class="card"><div class="card-header"><h2>Broker Tokens</h2></div><div class="config-grid" id="cfg-broker"></div></div>
+    </div>
+  </section>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
